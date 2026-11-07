@@ -1,5 +1,7 @@
 # FindIt
 
+[![CI](https://github.com/monkeprogrammer01/findit/actions/workflows/ci.yml/badge.svg)](https://github.com/monkeprogrammer01/findit/actions/workflows/ci.yml)
+
 **Automated University & Campus Lost and Found Management System**
 
 ## Team 404
@@ -127,4 +129,18 @@ pip install -r requirements-dev.txt
 uvicorn app.main:app --reload
 ```
 
-Run the tests with `pytest`.
+Before pushing, run the same checks as CI (from `backend/`):
+
+```bash
+ruff check .          # lint
+ruff format .         # auto-format
+pytest                # tests
+```
+
+## CI
+
+GitHub Actions ([.github/workflows/ci.yml](.github/workflows/ci.yml)) runs on
+every pull request and on pushes to `main`:
+
+- **Backend lint and tests**: `ruff check`, `ruff format --check`, `pytest`
+- **Backend Docker image**: builds `backend/Dockerfile`
