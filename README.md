@@ -55,3 +55,30 @@ email/SMS gateway.
 - Frontend: React
 - Database: PostgreSQL
 - Deployment: Docker
+
+## Project layout
+
+```
+backend/
+  app/
+    interface/       # HTTP API (FastAPI routers)
+    application/     # use cases: reports, cataloging, matching, claims, handover, retention
+    domain/          # item, claim and match rules
+    infrastructure/  # database, photo store, SSO, email/SMS gateway
+  tests/
+frontend/            # React web application
+docs/
+```
+
+## Running the backend
+
+```bash
+cd backend
+python3.12 -m venv .venv
+source .venv/bin/activate
+pip install -r requirements.txt
+uvicorn app.main:app --reload
+```
+
+The API is served at http://localhost:8000 (interactive docs at `/docs`).
+Run the tests with `pytest`.
