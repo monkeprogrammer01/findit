@@ -1,5 +1,7 @@
 # FindIt
 
+[![CI](https://github.com/monkeprogrammer01/findit/actions/workflows/ci.yml/badge.svg)](https://github.com/monkeprogrammer01/findit/actions/workflows/ci.yml)
+
 **Automated University & Campus Lost and Found Management System**
 
 ## Team 404
@@ -68,17 +70,77 @@ backend/
   tests/
 frontend/            # React web application
 docs/
+docker-compose.yml   # local infrastructure (PostgreSQL)
+.env.example         # template for .env
 ```
 
-## Running the backend
+## Running with Docker
+
+Requires Docker with Docker Compose v2.
+
+1. Create your local environment file and adjust the values:
+
+   ```bash
+   cp .env.example .env
+   ```
+
+   If port 5432 or 8000 is already taken on your machine, set another one in
+   `POSTGRES_PORT` / `BACKEND_PORT` (for example `5433`).
+
+2. Build and start PostgreSQL and the backend:
+
+   ```bash
+   docker compose up -d --build
+   ```
+
+3. Check that both services are ready. `STATUS` should show `(healthy)`:
+
+   ```bash
+   docker compose ps
+   ```
+
+The API is served at http://localhost:8000 (interactive docs at `/docs`).
+The backend waits until the database is healthy before it starts.
+
+Connect to the database from your machine with
+`postgresql://<POSTGRES_USER>:<POSTGRES_PASSWORD>@localhost:<POSTGRES_PORT>/<POSTGRES_DB>`,
+or open a psql shell inside the container:
 
 ```bash
+docker compose exec db psql -U <POSTGRES_USER> -d <POSTGRES_DB>
+```
+
+Stop the services with `docker compose down`. Database data and uploaded
+photos are kept in the `pgdata` and `photos` volumes; `docker compose down -v`
+deletes them.
+
+## Running the backend locally
+
+For day-to-day development with auto-reload, run only the database in Docker
+and the backend on your machine:
+
+```bash
+docker compose up -d db
+
 cd backend
 python3.12 -m venv .venv
 source .venv/bin/activate
-pip install -r requirements.txt
+pip install -r requirements-dev.txt
 uvicorn app.main:app --reload
 ```
 
-The API is served at http://localhost:8000 (interactive docs at `/docs`).
-Run the tests with `pytest`.
+Before pushing, run the same checks as CI (from `backend/`):
+
+```bash
+ruff check .          # lint
+ruff format .         # auto-format
+pytest                # tests
+```
+
+## CI
+
+GitHub Actions ([.github/workflows/ci.yml](.github/workflows/ci.yml)) runs on
+every pull request and on pushes to `main`:
+
+- **Backend lint and tests**: `ruff check`, `ruff format --check`, `pytest`
+- **Backend Docker image**: builds `backend/Dockerfile`
