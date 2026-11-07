@@ -68,7 +68,45 @@ backend/
   tests/
 frontend/            # React web application
 docs/
+docker-compose.yml   # local infrastructure (PostgreSQL)
+.env.example         # template for .env
 ```
+
+## Running the infrastructure
+
+Requires Docker with Docker Compose v2.
+
+1. Create your local environment file and adjust the values:
+
+   ```bash
+   cp .env.example .env
+   ```
+
+   If port 5432 is already taken on your machine, set another one in
+   `POSTGRES_PORT` (for example `5433`).
+
+2. Start PostgreSQL:
+
+   ```bash
+   docker compose up -d
+   ```
+
+3. Check that the database is ready. `STATUS` should show `(healthy)`:
+
+   ```bash
+   docker compose ps
+   ```
+
+Connect from your machine with
+`postgresql://<POSTGRES_USER>:<POSTGRES_PASSWORD>@localhost:<POSTGRES_PORT>/<POSTGRES_DB>`,
+or open a psql shell inside the container:
+
+```bash
+docker compose exec db psql -U <POSTGRES_USER> -d <POSTGRES_DB>
+```
+
+Stop the services with `docker compose down`. Data is kept in the `pgdata`
+volume; `docker compose down -v` deletes it.
 
 ## Running the backend
 
