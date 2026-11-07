@@ -72,7 +72,7 @@ docker-compose.yml   # local infrastructure (PostgreSQL)
 .env.example         # template for .env
 ```
 
-## Running the infrastructure
+## Running with Docker
 
 Requires Docker with Docker Compose v2.
 
@@ -82,22 +82,25 @@ Requires Docker with Docker Compose v2.
    cp .env.example .env
    ```
 
-   If port 5432 is already taken on your machine, set another one in
-   `POSTGRES_PORT` (for example `5433`).
+   If port 5432 or 8000 is already taken on your machine, set another one in
+   `POSTGRES_PORT` / `BACKEND_PORT` (for example `5433`).
 
-2. Start PostgreSQL:
+2. Build and start PostgreSQL and the backend:
 
    ```bash
-   docker compose up -d
+   docker compose up -d --build
    ```
 
-3. Check that the database is ready. `STATUS` should show `(healthy)`:
+3. Check that both services are ready. `STATUS` should show `(healthy)`:
 
    ```bash
    docker compose ps
    ```
 
-Connect from your machine with
+The API is served at http://localhost:8000 (interactive docs at `/docs`).
+The backend waits until the database is healthy before it starts.
+
+Connect to the database from your machine with
 `postgresql://<POSTGRES_USER>:<POSTGRES_PASSWORD>@localhost:<POSTGRES_PORT>/<POSTGRES_DB>`,
 or open a psql shell inside the container:
 
@@ -105,18 +108,23 @@ or open a psql shell inside the container:
 docker compose exec db psql -U <POSTGRES_USER> -d <POSTGRES_DB>
 ```
 
-Stop the services with `docker compose down`. Data is kept in the `pgdata`
-volume; `docker compose down -v` deletes it.
+Stop the services with `docker compose down`. Database data and uploaded
+photos are kept in the `pgdata` and `photos` volumes; `docker compose down -v`
+deletes them.
 
-## Running the backend
+## Running the backend locally
+
+For day-to-day development with auto-reload, run only the database in Docker
+and the backend on your machine:
 
 ```bash
+docker compose up -d db
+
 cd backend
 python3.12 -m venv .venv
 source .venv/bin/activate
-pip install -r requirements.txt
+pip install -r requirements-dev.txt
 uvicorn app.main:app --reload
 ```
 
-The API is served at http://localhost:8000 (interactive docs at `/docs`).
 Run the tests with `pytest`.
