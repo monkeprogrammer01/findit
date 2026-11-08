@@ -7,6 +7,7 @@ from datetime import UTC, datetime
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from app.application.audit import log_event
 from app.application.errors import BusinessRuleError, NotFoundError
 from app.application.found_items import get_item, get_questions
 from app.domain.claim_states import InvalidTransition, Transition, can_submit_claim, state_for
@@ -15,7 +16,9 @@ from app.infrastructure.db.models import (
     ClaimStatus,
     FoundItem,
     FoundItemStatus,
+    Handover,
     User,
+    VerificationMethod,
 )
 
 
@@ -143,3 +146,38 @@ def approve(db: Session, claim: Claim, admin_id: int) -> list[Claim]:
 def reject(db: Session, claim: Claim, admin_id: int) -> None:
     _apply(db, claim, _transition(claim, "reject"), admin_id)
     db.commit()
+
+
+def hand_over(
+    db: Session,
+    claim: Claim,
+    admin_id: int,
+    *,
+    recipient_name: str,
+    recipient_student_id: str,
+    verification_method: VerificationMethod,
+) -> Handover:
+    """FR-05: выдача вещи по одобренной заявке после проверки личности."""
+    transition = _transition(claim, "hand_over")  # без одобренной заявки выдачи нет
+    claimant = db.get(User, claim.claimant_id)
+    if recipient_student_id.strip() != claimant.campus_id:
+        raise BusinessRuleError("Student ID does not belong to the approved claimant")
+
+    handover = Handover(
+        claim_id=claim.id,
+        recipient_name=recipient_name,
+        recipient_student_id=recipient_student_id.strip(),
+        verification_method=verification_method,
+        issued_by_id=admin_id,
+    )
+    db.add(handover)
+    _apply(db, claim, transition, admin_id)
+    # log_event делает commit: выдача, статусы и запись аудита сохраняются вместе
+    log_event(
+        db,
+        action="handover",
+        user_id=admin_id,
+        details=(f"claim={claim.id} item={claim.found_item_id} method={verification_method.value}"),
+    )
+    db.refresh(handover)
+    return handover
