@@ -3,6 +3,7 @@ from fastapi import FastAPI
 from fastapi.testclient import TestClient
 from sqlalchemy import select
 
+from app.application.auth import hash_campus_id
 from app.infrastructure.auth.fake_sso import TEST_USERS, issue_token
 from app.infrastructure.db.models import AuditLog, User
 from app.infrastructure.db.session import get_db
@@ -68,7 +69,9 @@ def test_403_is_written_to_audit_log(probe_client, session_factory):
     assert entry.path == "/desk-only"
     assert entry.created_at is not None
     with session_factory() as session:
-        student = session.scalar(select(User).where(User.campus_id == TEST_USERS["student"]))
+        student = session.scalar(
+            select(User).where(User.campus_id_hash == hash_campus_id(TEST_USERS["student"]))
+        )
     assert entry.user_id == student.id
 
 

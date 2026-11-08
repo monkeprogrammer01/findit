@@ -16,6 +16,7 @@ from sqlalchemy import (
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.infrastructure.db.base import Base
+from app.infrastructure.db.types import EncryptedString, EncryptedText
 
 
 class UserRole(enum.StrEnum):
@@ -88,12 +89,12 @@ class User(Base):
 
     id: Mapped[int] = mapped_column(primary_key=True)
     # campus_id, email и phone станут зашифрованными в BE-5, поэтому длина с запасом
-    campus_id: Mapped[str] = mapped_column(String(512))
+    campus_id: Mapped[str] = mapped_column(EncryptedString(512))
     # хэш campus_id: по нему ищем пользователя при входе (шифртекст искать нельзя)
     campus_id_hash: Mapped[str] = mapped_column(String(64), unique=True, index=True)
     role: Mapped[UserRole] = mapped_column(_enum(UserRole), default=UserRole.student)
-    email: Mapped[str | None] = mapped_column(String(512))
-    phone: Mapped[str | None] = mapped_column(String(512))
+    email: Mapped[str | None] = mapped_column(EncryptedString(512))
+    phone: Mapped[str | None] = mapped_column(EncryptedString(512))
     created_at: Mapped[datetime] = _now()
 
 
@@ -144,7 +145,7 @@ class VerificationQuestion(Base):
         ForeignKey("found_items.id", ondelete="CASCADE"), index=True
     )
     question: Mapped[str] = mapped_column(Text)
-    correct_answer: Mapped[str] = mapped_column(Text)
+    correct_answer: Mapped[str] = mapped_column(EncryptedText)
 
 
 class Claim(Base):
@@ -154,7 +155,7 @@ class Claim(Base):
     found_item_id: Mapped[int] = mapped_column(ForeignKey("found_items.id"), index=True)
     claimant_id: Mapped[int] = mapped_column(ForeignKey("users.id"), index=True)
     # ответы студента (JSON-строка), в BE-5 будут зашифрованы
-    answers: Mapped[str] = mapped_column(Text)
+    answers: Mapped[str] = mapped_column(EncryptedText)
     status: Mapped[ClaimStatus] = mapped_column(
         _enum(ClaimStatus), default=ClaimStatus.pending, index=True
     )
@@ -170,7 +171,7 @@ class Handover(Base):
     claim_id: Mapped[int] = mapped_column(ForeignKey("claims.id"), unique=True)
     recipient_name: Mapped[str] = mapped_column(String(200))
     # номер студенческого, в BE-5 будет зашифрован
-    recipient_student_id: Mapped[str] = mapped_column(String(512))
+    recipient_student_id: Mapped[str] = mapped_column(EncryptedString(512))
     verification_method: Mapped[VerificationMethod] = mapped_column(_enum(VerificationMethod))
     issued_by_id: Mapped[int] = mapped_column(ForeignKey("users.id"))
     issued_at: Mapped[datetime] = _now()

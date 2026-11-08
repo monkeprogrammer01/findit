@@ -14,6 +14,7 @@ class Settings(BaseSettings):
     oidc_audience: str = "findit"
     oidc_jwks_url: str | None = None
     campus_id_hash_key: str = "dev-only-change-me"
+    encryption_key: str | None = None
 
 
 @lru_cache
