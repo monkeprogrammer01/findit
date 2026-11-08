@@ -1,13 +1,20 @@
 """FR-02: каталогизация найденных вещей и загрузка фото."""
 
 import uuid
+from datetime import date
 
-from sqlalchemy import select
+from sqlalchemy import func, or_, select
 from sqlalchemy.orm import Session
 
 from app.application.errors import BusinessRuleError, NotFoundError, StorageLimitError
 from app.config import get_settings
-from app.infrastructure.db.models import FoundItem, VerificationQuestion
+from app.infrastructure.db.models import (
+    CampusLocation,
+    FoundItem,
+    FoundItemStatus,
+    ItemCategory,
+    VerificationQuestion,
+)
 from app.infrastructure.storage.photos import PhotoStore
 
 # Тип файла определяем по первым байтам, а не по имени или Content-Type от клиента
@@ -88,3 +95,56 @@ def read_photo(store: PhotoStore, item: FoundItem, name: str) -> tuple[bytes, st
     if data is None:
         raise NotFoundError("Photo not found")
     return data, CONTENT_TYPES[name.rsplit(".", 1)[-1]]
+
+
+# Студенты видят только вещи, которые ещё можно забрать
+VISIBLE_TO_STUDENTS = (FoundItemStatus.stored, FoundItemStatus.eligible_for_disposal)
+
+
+def _escape_like(text: str) -> str:
+    return text.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
+
+
+def search_items(
+    db: Session,
+    *,
+    statuses: tuple[FoundItemStatus, ...],
+    category: ItemCategory | None = None,
+    location: CampusLocation | None = None,
+    date_from: date | None = None,
+    date_to: date | None = None,
+    color: str | None = None,
+    text: str | None = None,
+    limit: int = 20,
+    offset: int = 0,
+) -> tuple[list[FoundItem], int]:
+    """Поиск для атрибута качества 2. Фильтры по колонкам с индексами идут первыми."""
+    conditions = [FoundItem.status.in_(statuses)]
+    if category is not None:
+        conditions.append(FoundItem.category == category)
+    if location is not None:
+        conditions.append(FoundItem.location == location)
+    if date_from is not None:
+        conditions.append(FoundItem.found_date >= date_from)
+    if date_to is not None:
+        conditions.append(FoundItem.found_date <= date_to)
+    if color:
+        conditions.append(func.lower(FoundItem.color) == color.strip().lower())
+    if text and text.strip():
+        pattern = f"%{_escape_like(text.strip())}%"
+        conditions.append(
+            or_(
+                FoundItem.title.ilike(pattern, escape="\\"),
+                FoundItem.description.ilike(pattern, escape="\\"),
+            )
+        )
+
+    total = db.scalar(select(func.count()).select_from(FoundItem).where(*conditions))
+    stmt = (
+        select(FoundItem)
+        .where(*conditions)
+        .order_by(FoundItem.found_date.desc(), FoundItem.id.desc())
+        .limit(limit)
+        .offset(offset)
+    )
+    return list(db.scalars(stmt)), total or 0
