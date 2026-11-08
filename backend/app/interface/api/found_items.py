@@ -1,7 +1,7 @@
 from datetime import date, datetime
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, File, Response, UploadFile, status
+from fastapi import APIRouter, Depends, File, HTTPException, Query, Response, UploadFile, status
 from pydantic import BaseModel, ConfigDict, Field, StringConstraints, field_validator
 
 from app.application import found_items as service
@@ -11,6 +11,7 @@ from app.infrastructure.db.models import (
     FoundItem,
     FoundItemStatus,
     ItemCategory,
+    UserRole,
 )
 from app.infrastructure.storage.photos import PhotoStore, get_photo_store
 from app.interface.api.deps import CurrentUser, DbSession, DeskAdmin
@@ -89,6 +90,13 @@ class FoundItemAdmin(FoundItemPublic):
     questions: list[QuestionWithAnswer]
 
 
+class FoundItemPage(BaseModel):
+    items: list[FoundItemPublic]
+    total: int
+    limit: int
+    offset: int
+
+
 class PhotoOut(BaseModel):
     name: str
     url: str
@@ -133,6 +141,49 @@ def create_found_item(data: FoundItemCreate, admin: DeskAdmin, db: DbSession):
     questions = [q.model_dump() for q in data.questions]
     item = service.create_item(db, admin.id, fields, questions)
     return to_admin(db, item)
+
+
+@router.get("", response_model=FoundItemPage)
+def search_found_items(
+    user: CurrentUser,
+    db: DbSession,
+    q: Annotated[
+        str | None, Query(max_length=100, description="Текст в названии или описании")
+    ] = None,
+    category: ItemCategory | None = None,
+    location: CampusLocation | None = None,
+    date_from: date | None = None,
+    date_to: date | None = None,
+    color: Annotated[str | None, Query(max_length=50)] = None,
+    item_status: Annotated[
+        FoundItemStatus | None, Query(alias="status", description="Только для сотрудников")
+    ] = None,
+    limit: Annotated[int, Query(ge=1, le=100)] = 20,
+    offset: Annotated[int, Query(ge=0)] = 0,
+):
+    if date_from and date_to and date_from > date_to:
+        raise HTTPException(status_code=422, detail="date_from must not be after date_to")
+    if user.role == UserRole.student:
+        statuses = service.VISIBLE_TO_STUDENTS
+        if item_status is not None:
+            statuses = tuple(s for s in statuses if s == item_status)
+    else:
+        statuses = (item_status,) if item_status else tuple(FoundItemStatus)
+    items, total = service.search_items(
+        db,
+        statuses=statuses,
+        category=category,
+        location=location,
+        date_from=date_from,
+        date_to=date_to,
+        color=color,
+        text=q,
+        limit=limit,
+        offset=offset,
+    )
+    return FoundItemPage(
+        items=[to_public(i) for i in items], total=total, limit=limit, offset=offset
+    )
 
 
 @router.get("/{item_id}", response_model=FoundItemPublic)
