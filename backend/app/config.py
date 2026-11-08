@@ -9,6 +9,7 @@ class Settings(BaseSettings):
     app_name: str = "FindIt"
     environment: str = "local"
     cors_origins: list[str] = ["http://localhost:5173"]
+    database_url: str = "postgresql+psycopg://findit:findit@localhost:5432/findit"
 
 
 @lru_cache
