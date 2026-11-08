@@ -16,6 +16,12 @@ class Settings(BaseSettings):
     campus_id_hash_key: str = "dev-only-change-me"
     encryption_key: str | None = None
 
+    # BE-7: фото найденных вещей (в docker-compose это volume photos)
+    photo_storage_dir: str = "storage/photos"
+    photo_max_bytes: int = 5 * 1024 * 1024  # одно фото не больше 5 МБ
+    photo_storage_limit_bytes: int = 10 * 1024**3  # C-01: всё хранилище не больше 10 ГБ
+    photos_per_item: int = 5
+
 
 @lru_cache
 def get_settings() -> Settings:
