@@ -15,6 +15,8 @@ class Settings(BaseSettings):
     oidc_jwks_url: str | None = None
     campus_id_hash_key: str = "dev-only-change-me"
     encryption_key: str | None = None
+    retention_days: int = 90  # FR-06: срок хранения найденной вещи
+    scheduler_enabled: bool = True  # ежедневная задача по расписанию
 
     # BE-7: фото найденных вещей (в docker-compose это volume photos)
     photo_storage_dir: str = "storage/photos"
