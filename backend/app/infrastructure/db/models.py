@@ -18,13 +18,13 @@ from sqlalchemy.orm import Mapped, mapped_column
 from app.infrastructure.db.base import Base
 
 
-class UserRole(str, enum.Enum):
+class UserRole(enum.StrEnum):
     student = "student"
     desk_admin = "desk_admin"
     sys_admin = "sys_admin"
 
 
-class ItemCategory(str, enum.Enum):
+class ItemCategory(enum.StrEnum):
     electronics = "electronics"
     documents = "documents"
     keys = "keys"
@@ -34,7 +34,7 @@ class ItemCategory(str, enum.Enum):
     other = "other"
 
 
-class CampusLocation(str, enum.Enum):
+class CampusLocation(enum.StrEnum):
     library = "library"
     main_building = "main_building"
     dormitory = "dormitory"
@@ -44,27 +44,27 @@ class CampusLocation(str, enum.Enum):
     other = "other"
 
 
-class LostReportStatus(str, enum.Enum):
+class LostReportStatus(enum.StrEnum):
     open = "open"
     matched = "matched"
     closed = "closed"
 
 
-class FoundItemStatus(str, enum.Enum):
+class FoundItemStatus(enum.StrEnum):
     stored = "stored"
     claimed = "claimed"
     returned = "returned"
     eligible_for_disposal = "eligible_for_disposal"
 
 
-class ClaimStatus(str, enum.Enum):
+class ClaimStatus(enum.StrEnum):
     pending = "pending"
     approved = "approved"
     rejected = "rejected"
     returned = "returned"
 
 
-class VerificationMethod(str, enum.Enum):
+class VerificationMethod(enum.StrEnum):
     student_id_in_person = "student_id_in_person"
     digital_token = "digital_token"
 
