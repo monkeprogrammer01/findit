@@ -134,6 +134,8 @@ class FoundItem(Base):
         _enum(FoundItemStatus), default=FoundItemStatus.stored, index=True
     )
     received_at: Mapped[datetime] = _now()  # дата поступления (для срока 90 дней)
+    # когда вещь помечена к утилизации (нужно для квартального отчёта)
+    disposal_flagged_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     created_by_id: Mapped[int] = mapped_column(ForeignKey("users.id"))
 
 
