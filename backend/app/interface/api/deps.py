@@ -1,3 +1,5 @@
+from typing import Annotated
+
 from fastapi import Depends, HTTPException, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from sqlalchemy.orm import Session
@@ -10,6 +12,9 @@ from app.infrastructure.db.session import get_db
 # auto_error=False: иначе FastAPI вернёт 403, а нам нужен 401
 bearer_scheme = HTTPBearer(auto_error=False)
 
+DbSession = Annotated[Session, Depends(get_db)]
+Credentials = Annotated[HTTPAuthorizationCredentials | None, Depends(bearer_scheme)]
+
 
 def _unauthorized(detail: str) -> HTTPException:
     return HTTPException(
@@ -19,10 +24,7 @@ def _unauthorized(detail: str) -> HTTPException:
     )
 
 
-def get_current_user(
-    credentials: HTTPAuthorizationCredentials | None = Depends(bearer_scheme),
-    db: Session = Depends(get_db),
-) -> User:
+def get_current_user(credentials: Credentials, db: DbSession) -> User:
     if credentials is None:
         raise _unauthorized("Not authenticated")
     try:
@@ -30,3 +32,7 @@ def get_current_user(
     except TokenError as exc:
         raise _unauthorized("Invalid or expired token") from exc
     return get_or_create_user(db, claims)
+
+
+# Короткая запись для эндпоинтов: def handler(user: CurrentUser)
+CurrentUser = Annotated[User, Depends(get_current_user)]

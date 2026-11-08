@@ -1,8 +1,8 @@
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter
 from pydantic import BaseModel, ConfigDict
 
-from app.infrastructure.db.models import User, UserRole
-from app.interface.api.deps import get_current_user
+from app.infrastructure.db.models import UserRole
+from app.interface.api.deps import CurrentUser
 
 router = APIRouter(tags=["auth"])
 
@@ -17,5 +17,5 @@ class MeResponse(BaseModel):
 
 
 @router.get("/me", response_model=MeResponse)
-def read_me(user: User = Depends(get_current_user)):
+def read_me(user: CurrentUser):
     return user
