@@ -8,7 +8,7 @@ import random
 import sys
 from datetime import UTC, date, datetime, timedelta
 
-from sqlalchemy import delete, insert, select
+from sqlalchemy import delete, func, insert, select
 
 from app.infrastructure.db import models as m
 from app.infrastructure.db.session import SessionLocal
@@ -16,10 +16,26 @@ from app.infrastructure.db.session import SessionLocal
 SEED_MARK = "[seed]"
 BATCH = 2000
 TITLES = [
-    "iPhone 13", "Samsung Galaxy", "AirPods", "House keys", "Wallet", "Backpack",
-    "Student card", "Laptop charger", "Umbrella", "Water bottle", "Notebook",
-    "Calculator", "Headphones", "Power bank", "Glasses", "Jacket", "Scarf",
-    "USB flash drive", "MacBook", "Textbook",
+    "iPhone 13",
+    "Samsung Galaxy",
+    "AirPods",
+    "House keys",
+    "Wallet",
+    "Backpack",
+    "Student card",
+    "Laptop charger",
+    "Umbrella",
+    "Water bottle",
+    "Notebook",
+    "Calculator",
+    "Headphones",
+    "Power bank",
+    "Glasses",
+    "Jacket",
+    "Scarf",
+    "USB flash drive",
+    "MacBook",
+    "Textbook",
 ]
 COLORS = ["black", "white", "blue", "red", "gray", "green", "brown", "yellow"]
 
@@ -38,7 +54,7 @@ def build_rows(total: int, user_id: int) -> list[dict]:
             {
                 "title": title,
                 "category": random.choice(categories),
-                "found_date": (received.date() if received.date() <= date.today() else date.today()),
+                "found_date": min(received.date(), date.today()),
                 "location": random.choice(locations),
                 "color": color,
                 "serial_number": f"SN-{random.randint(0, 99_999_999):08d}"
@@ -68,8 +84,8 @@ def main() -> None:
             db.execute(insert(m.FoundItem), rows[start : start + BATCH])
             db.commit()
             print(f"{min(start + BATCH, total)}/{total}")
-        count = db.scalar(select(m.func.count(m.FoundItem.id))) if hasattr(m, "func") else None
-        print("done", count if count is not None else "")
+        count = db.scalar(select(func.count(m.FoundItem.id)))
+        print("done, rows in found_items:", count)
 
 
 if __name__ == "__main__":

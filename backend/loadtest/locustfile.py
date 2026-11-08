@@ -18,7 +18,9 @@ class StudentUser(HttpUser):
     wait_time = between(0.5, 2)
 
     def on_start(self):
-        response = self.client.post("/dev-sso/token", params={"role": "student"}, name="dev-sso token")
+        response = self.client.post(
+            "/dev-sso/token", params={"role": "student"}, name="dev-sso token"
+        )
         self.client.headers.update({"Authorization": f"Bearer {response.json()['access_token']}"})
 
     @task(3)
