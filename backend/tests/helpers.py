@@ -8,7 +8,8 @@ YESTERDAY = (date.today() - timedelta(days=1)).isoformat()
 
 
 def headers(campus_id: str = "student001", role: str = "student") -> dict:
-    return {"Authorization": f"Bearer {issue_token(campus_id, role)}"}
+    token = issue_token(campus_id, role, email=f"{campus_id}@stu.sdu.edu.kz")
+    return {"Authorization": f"Bearer {token}"}
 
 
 ADMIN = headers("desk001", "desk_admin")

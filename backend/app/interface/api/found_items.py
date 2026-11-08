@@ -1,24 +1,39 @@
 from datetime import date, datetime
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, File, HTTPException, Query, Response, UploadFile, status
+from fastapi import (
+    APIRouter,
+    BackgroundTasks,
+    Depends,
+    File,
+    HTTPException,
+    Query,
+    Response,
+    UploadFile,
+    status,
+)
 from pydantic import BaseModel, ConfigDict, Field, StringConstraints, field_validator
 
 from app.application import found_items as service
+from app.application import matching
+from app.application.notifications import Notifier, notify
 from app.config import get_settings
 from app.infrastructure.db.models import (
     CampusLocation,
     FoundItem,
     FoundItemStatus,
     ItemCategory,
+    User,
     UserRole,
 )
+from app.infrastructure.notifications.gateway import get_notifier
 from app.infrastructure.storage.photos import PhotoStore, get_photo_store
 from app.interface.api.deps import CurrentUser, DbSession, DeskAdmin
 
 router = APIRouter(prefix="/found-items", tags=["found-items"])
 
 Photos = Annotated[PhotoStore, Depends(get_photo_store)]
+Notifications = Annotated[Notifier, Depends(get_notifier)]
 Text200 = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=200)]
 Text50 = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=50)]
 Color = Annotated[str, StringConstraints(strip_whitespace=True, max_length=50)]
@@ -136,10 +151,28 @@ def to_admin(db: DbSession, item: FoundItem) -> FoundItemAdmin:
 
 
 @router.post("", response_model=FoundItemAdmin, status_code=status.HTTP_201_CREATED)
-def create_found_item(data: FoundItemCreate, admin: DeskAdmin, db: DbSession):
+def create_found_item(
+    data: FoundItemCreate,
+    admin: DeskAdmin,
+    db: DbSession,
+    background: BackgroundTasks,
+    notifier: Notifications,
+):
     fields = data.model_dump(exclude={"questions"})
     questions = [q.model_dump() for q in data.questions]
     item = service.create_item(db, admin.id, fields, questions)
+    # FR-03: сразу ищем подходящие отчёты о потере и пишем их авторам
+    for report, score in matching.match_found_item(db, item):
+        author = db.get(User, report.author_id)
+        notify(
+            background,
+            notifier,
+            author,
+            "match_found",
+            report_title=report.title,
+            item_title=item.title,
+            score=score,
+        )
     return to_admin(db, item)
 
 

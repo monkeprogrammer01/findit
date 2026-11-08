@@ -22,6 +22,11 @@ class Settings(BaseSettings):
     photo_storage_limit_bytes: int = 10 * 1024**3  # C-01: всё хранилище не больше 10 ГБ
     photos_per_item: int = 5
 
+    # BE-11: уведомления; по умолчанию MailHog из docker-compose
+    smtp_host: str = "localhost"
+    smtp_port: int = 1025
+    mail_from: str = "FindIt <noreply@findit.local>"
+
 
 @lru_cache
 def get_settings() -> Settings:

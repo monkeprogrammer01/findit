@@ -1,7 +1,7 @@
 from datetime import date, datetime
 from typing import Annotated
 
-from fastapi import APIRouter, HTTPException, Query, Request, status
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query, Request, status
 from pydantic import (
     BaseModel,
     ConfigDict,
@@ -11,6 +11,8 @@ from pydantic import (
 )
 
 from app.application import lost_reports as service
+from app.application import matching
+from app.application.notifications import Notifier, notify
 from app.infrastructure.db.models import (
     CampusLocation,
     ItemCategory,
@@ -18,7 +20,9 @@ from app.infrastructure.db.models import (
     LostReportStatus,
     UserRole,
 )
+from app.infrastructure.notifications.gateway import get_notifier
 from app.interface.api.deps import CurrentUser, DbSession, forbid
+from app.interface.api.found_items import FoundItemPublic, to_public
 
 router = APIRouter(prefix="/lost-reports", tags=["lost-reports"])
 
@@ -29,6 +33,7 @@ Title = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, ma
 Color = Annotated[str, StringConstraints(strip_whitespace=True, max_length=50)]
 SerialNumber = Annotated[str, StringConstraints(strip_whitespace=True, max_length=100)]
 Description = Annotated[str, StringConstraints(max_length=2000)]
+Notifications = Annotated[Notifier, Depends(get_notifier)]
 Limit = Annotated[int, Query(ge=1, le=100)]
 Offset = Annotated[int, Query(ge=0)]
 
@@ -81,6 +86,11 @@ class LostReportUpdate(BaseModel):
         return self
 
 
+class MatchOut(BaseModel):
+    score: float
+    found_item: FoundItemPublic
+
+
 class LostReportOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
@@ -105,8 +115,29 @@ def _load(db: DbSession, report_id: int) -> LostReport:
 
 
 @router.post("", response_model=LostReportOut, status_code=status.HTTP_201_CREATED)
-def create_lost_report(data: LostReportCreate, user: CurrentUser, db: DbSession):
-    return service.create_report(db, user.id, data.model_dump())
+def create_lost_report(
+    data: LostReportCreate,
+    user: CurrentUser,
+    db: DbSession,
+    background: BackgroundTasks,
+    notifier: Notifications,
+):
+    report = service.create_report(db, user.id, data.model_dump())
+    # BE-9: вещь могли найти раньше, чем студент подал отчёт
+    matches = matching.match_lost_report(db, report)
+    if matches:
+        best_item, best_score = max(matches, key=lambda pair: pair[1])
+        notify(
+            background,
+            notifier,
+            user,
+            "match_found",
+            report_title=report.title,
+            item_title=best_item.title,
+            score=best_score,
+        )
+        db.refresh(report)
+    return report
 
 
 # /me объявлен раньше /{report_id}, иначе "me" попытались бы разобрать как число
@@ -143,3 +174,15 @@ def delete_lost_report(report_id: int, request: Request, user: CurrentUser, db: 
     if report.author_id != user.id:
         raise forbid(request, db, user, f"not the author of lost report {report_id}")
     service.delete_report(db, report)
+
+
+@router.get("/{report_id}/matches", response_model=list[MatchOut])
+def read_matches(report_id: int, request: Request, user: CurrentUser, db: DbSession):
+    """FR-03: найденные вещи, похожие на этот отчёт, сначала самые похожие."""
+    report = _load(db, report_id)
+    if report.author_id != user.id and user.role not in STAFF_ROLES:
+        raise forbid(request, db, user, f"not the author of lost report {report_id}")
+    return [
+        MatchOut(score=score, found_item=to_public(item))
+        for item, score in matching.list_matches(db, report_id)
+    ]
