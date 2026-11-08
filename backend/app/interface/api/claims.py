@@ -13,6 +13,7 @@ from app.infrastructure.db.models import (
     FoundItem,
     FoundItemStatus,
     User,
+    VerificationMethod,
 )
 from app.infrastructure.notifications.gateway import get_notifier
 from app.interface.api.deps import CurrentUser, DbSession, DeskAdmin
@@ -78,6 +79,26 @@ class ClaimDetail(ClaimSummary):
     storage_desk: str
     storage_cell: str
     answers: list[ReviewRowOut]
+
+
+class HandoverIn(BaseModel):
+    verification_method: VerificationMethod
+    recipient_name: Annotated[
+        str, StringConstraints(strip_whitespace=True, min_length=2, max_length=200)
+    ]
+    recipient_student_id: Annotated[
+        str, StringConstraints(strip_whitespace=True, min_length=1, max_length=50)
+    ]
+
+
+class HandoverOut(BaseModel):
+    id: int
+    claim_id: int
+    item: ItemBrief
+    recipient_name: str
+    verification_method: VerificationMethod
+    issued_by_id: int
+    issued_at: datetime
 
 
 def _brief(item: FoundItem) -> ItemBrief:
@@ -211,3 +232,46 @@ def reject_claim(
         item_title=item.title,
     )
     return _detail(db, claim)
+
+
+@router.post(
+    "/claims/{claim_id}/handover",
+    response_model=HandoverOut,
+    status_code=status.HTTP_201_CREATED,
+)
+def hand_over_item(
+    claim_id: int,
+    data: HandoverIn,
+    admin: DeskAdmin,
+    db: DbSession,
+    background: BackgroundTasks,
+    notifier: Notifications,
+):
+    """FR-05: только по одобренной заявке и только её владельцу."""
+    claim = service.get_claim(db, claim_id)
+    handover = service.hand_over(
+        db,
+        claim,
+        admin.id,
+        recipient_name=data.recipient_name,
+        recipient_student_id=data.recipient_student_id,
+        verification_method=data.verification_method,
+    )
+    item = db.get(FoundItem, claim.found_item_id)
+    notify(
+        background,
+        notifier,
+        db.get(User, claim.claimant_id),
+        "item_returned",
+        item_title=item.title,
+        date=handover.issued_at.date().isoformat(),
+    )
+    return HandoverOut(
+        id=handover.id,
+        claim_id=claim.id,
+        item=_brief(item),
+        recipient_name=handover.recipient_name,
+        verification_method=handover.verification_method,
+        issued_by_id=handover.issued_by_id,
+        issued_at=handover.issued_at,
+    )

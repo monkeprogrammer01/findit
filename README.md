@@ -50,6 +50,7 @@ email/SMS gateway.
 
 - Container diagram: [docs/architecture/container-diagram.md](docs/architecture/container-diagram.md)
 - ADR-001: [docs/adr/ADR-001-university-sso.md](docs/adr/ADR-001-university-sso.md)
+- ADR-002: [docs/adr/ADR-002-claim-state-pattern.md](docs/adr/ADR-002-claim-state-pattern.md)
 
 ## Tech stack
 
@@ -113,6 +114,29 @@ docker compose exec db psql -U <POSTGRES_USER> -d <POSTGRES_DB>
 Stop the services with `docker compose down`. Database data and uploaded
 photos are kept in the `pgdata` and `photos` volumes; `docker compose down -v`
 deletes them.
+
+## API overview
+
+Interactive docs: http://localhost:8000/docs. In local mode get a test token with
+`POST /dev-sso/token?role=student|desk_admin|sys_admin` and press **Authorize**.
+
+| Area | Endpoints | Who |
+| --- | --- | --- |
+| Lost reports (FR-01) | `POST /lost-reports`, `GET /lost-reports/me`, `GET/PATCH/DELETE /lost-reports/{id}` | author |
+| Matches (FR-03) | `GET /lost-reports/{id}/matches` | author, staff |
+| Found items (FR-02) | `POST /found-items`, `POST /found-items/{id}/photos`, `GET /found-items/{id}/full` | desk_admin |
+| Search | `GET /found-items?q=&category=&location=&date_from=&date_to=&color=&limit=&offset=` | everyone |
+| Item card | `GET /found-items/{id}`, `GET /found-items/{id}/questions`, `GET /found-items/{id}/photos/{name}` | everyone |
+| Claims (FR-04) | `POST /found-items/{id}/claims`, `GET /claims/me` | student |
+| Claim review | `GET /claims?status=`, `GET /claims/{id}`, `POST /claims/{id}/approve`, `POST /claims/{id}/reject` | desk_admin |
+| Handover (FR-05) | `POST /claims/{id}/handover` | desk_admin |
+
+Public item responses never contain the storage location, serial number or
+verification answers. New found items are matched against open lost reports
+right away (and new lost reports against stored items); authors get an email.
+
+Emails go to **MailHog** in local development: open http://localhost:8025 to see
+every message the backend sent.
 
 ## Running the backend locally
 
