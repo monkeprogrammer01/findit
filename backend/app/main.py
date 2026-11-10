@@ -4,7 +4,7 @@ from fastapi.responses import JSONResponse
 
 from app.application.errors import BusinessRuleError, NotFoundError, StorageLimitError
 from app.config import get_settings
-from app.interface.api import claims, dev_sso, found_items, health, lost_reports, me, reports
+from app.interface.api import admin, claims, dev_sso, found_items, health, lost_reports, me, reports
 from app.interface.lifespan import lifespan
 
 # Ошибки прикладного слоя -> HTTP-коды, в одном месте для всех роутеров
@@ -28,6 +28,7 @@ def create_app() -> FastAPI:
     )
     app.include_router(health.router)
     app.include_router(me.router)
+    app.include_router(admin.router)
     app.include_router(reports.router)
     app.include_router(lost_reports.router)
     app.include_router(found_items.router)

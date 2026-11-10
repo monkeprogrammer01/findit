@@ -4,6 +4,7 @@ from datetime import UTC, datetime, timedelta
 from sqlalchemy import select, update
 from sqlalchemy.orm import Session
 
+from app.application.app_settings import RETENTION_KEY, get_setting
 from app.application.audit import log_event
 from app.config import get_settings
 from app.infrastructure.db.models import Claim, ClaimStatus, FoundItem, FoundItemStatus
@@ -16,8 +17,9 @@ ACTIVE_CLAIMS = (ClaimStatus.pending, ClaimStatus.approved)
 
 
 def get_retention_days(db: Session) -> int:
-    """Срок хранения в днях. В BE-14 его можно будет менять через API."""
-    return get_settings().retention_days
+    """Срок хранения в днях: значение из базы (его меняет sys_admin), иначе из настроек."""
+    value = get_setting(db, RETENTION_KEY)
+    return int(value) if value is not None else get_settings().retention_days
 
 
 def mark_overdue_items(db: Session, now: datetime | None = None) -> int:
