@@ -9,8 +9,10 @@ from sqlalchemy.orm import Session
 
 from app.application.audit import log_event
 from app.application.errors import BusinessRuleError, NotFoundError
+from app.application.event_bus import EventPublisher
 from app.application.found_items import get_item, get_questions
 from app.domain.claim_states import InvalidTransition, Transition, can_submit_claim, state_for
+from app.domain.events import ItemReturned
 from app.infrastructure.db.models import (
     Claim,
     ClaimStatus,
@@ -156,6 +158,7 @@ def hand_over(
     recipient_name: str,
     recipient_student_id: str,
     verification_method: VerificationMethod,
+    events: EventPublisher | None = None,
 ) -> Handover:
     """FR-05: выдача вещи по одобренной заявке после проверки личности."""
     transition = _transition(claim, "hand_over")  # без одобренной заявки выдачи нет
@@ -180,4 +183,10 @@ def hand_over(
         details=(f"claim={claim.id} item={claim.found_item_id} method={verification_method.value}"),
     )
     db.refresh(handover)
+
+    if events is not None:
+        item = db.get(FoundItem, claim.found_item_id)
+        events.publish(
+            ItemReturned.new(found_item_id=item.id, claim_id=claim.id, category=item.category.value)
+        )
     return handover

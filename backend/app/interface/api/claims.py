@@ -17,6 +17,7 @@ from app.infrastructure.db.models import (
 )
 from app.infrastructure.notifications.gateway import get_notifier
 from app.interface.api.deps import CurrentUser, DbSession, DeskAdmin
+from app.interface.api.events import Events
 
 router = APIRouter(tags=["claims"])
 
@@ -246,6 +247,7 @@ def hand_over_item(
     db: DbSession,
     background: BackgroundTasks,
     notifier: Notifications,
+    events: Events,
 ):
     """FR-05: только по одобренной заявке и только её владельцу."""
     claim = service.get_claim(db, claim_id)
@@ -256,6 +258,7 @@ def hand_over_item(
         recipient_name=data.recipient_name,
         recipient_student_id=data.recipient_student_id,
         verification_method=data.verification_method,
+        events=events,
     )
     item = db.get(FoundItem, claim.found_item_id)
     notify(

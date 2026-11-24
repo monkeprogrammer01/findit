@@ -219,3 +219,21 @@ class AppSetting(Base):
         DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
     )
     updated_by_id: Mapped[int | None] = mapped_column(ForeignKey("users.id"))
+
+
+class ProcessedEvent(Base):
+    __tablename__ = "processed_events"
+
+    event_id: Mapped[str] = mapped_column(String(36), primary_key=True)
+    consumer: Mapped[str] = mapped_column(String(100), primary_key=True)
+    processed_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )
+
+
+class ReturnStatistic(Base):
+    __tablename__ = "return_statistics"
+
+    category: Mapped[ItemCategory] = mapped_column(_enum(ItemCategory), primary_key=True)
+    returned_count: Mapped[int] = mapped_column(default=0)
+    last_returned_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
