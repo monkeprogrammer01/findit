@@ -102,7 +102,7 @@ def test_other_student_cannot_read_and_denial_is_audited(client, session_factory
     assert response.status_code == 403
     assert response.json() == {"detail": "Forbidden"}
     with session_factory() as session:
-        rows = list(session.scalars(select(AuditLog)))
+        rows = list(session.scalars(select(AuditLog).where(AuditLog.action == "forbidden")))
     assert len(rows) == 1
     assert rows[0].action == "forbidden"
     assert rows[0].path == url

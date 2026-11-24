@@ -1,5 +1,6 @@
-from datetime import date, datetime
+from datetime import UTC, date, datetime
 from typing import Annotated
+from uuid import uuid4
 
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query, Request, status
 from pydantic import (
@@ -12,6 +13,7 @@ from pydantic import (
 
 from app.application import lost_reports as service
 from app.application import matching
+from app.application.events import LostReportCreated, event_bus
 from app.application.notifications import Notifier, notify
 from app.infrastructure.db.models import (
     CampusLocation,
@@ -123,6 +125,14 @@ def create_lost_report(
     notifier: Notifications,
 ):
     report = service.create_report(db, user.id, data.model_dump())
+    event_bus.publish(
+        LostReportCreated(
+            event_id=str(uuid4()),
+            report_id=report.id,
+            occurred_at=datetime.now(UTC),
+        ),
+        db,
+    )
     # BE-9: вещь могли найти раньше, чем студент подал отчёт
     matches = matching.match_lost_report(db, report)
     if matches:
